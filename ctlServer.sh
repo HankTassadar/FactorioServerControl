@@ -7,7 +7,21 @@ port=1338
 #shell variable
 pidfile=.factorio.pid
 serverpackurl=https://factorio.com/get-download/stable/headless/linux64
+modbackupPath=./config/modbackup
+mapbackupPath=./config/mapbackup
 
+MD(){
+    if [ ! -d $1 ]
+    then
+        mkdir $1
+    fi
+}
+
+InitCtlServerEnv(){
+    MD config
+    MD $modbackupPath
+    MD $mapbackupPath
+}
 
 LogRed(){
     echo -e "\033[31m$1\033[0m"
@@ -108,11 +122,47 @@ stop : Stop the server if it's running \n\
 start : Start the server if it's not running \n\
 reboot : Restart the server whether it's running \n\
 update : Download the latest Server Package and decompress it \n\
+init : Initialize the server to create some floder like mods, config
 "
 echo -e $helpstr
 
 }
 
+InitServer(){
+    testmap=testmap.zip
+    cmdstr="./factorio/bin/x64/factorio --create $testmap"
+    LogYellow "Initialize...... \nStart to Create TestMap"
+    $cmdstr
+    LogGreen "Initialize Finish!"
+    rm -rf $testmap
+}
+
+BackupServer(){
+    if [ -d ./factorio/mods ]
+    then
+        LogYellow "Backup mods ......"
+        cp -r factorio/mods $modbackupPath
+    fi
+    if [ -d ./factorio/saves ]
+    then
+        LogYellow "Backup maps ......"
+        cp -r ./factorio/saves $mapbackupPath
+    fi
+    LogGreen "Backup Finish!"
+}
+
+InstallServer(){
+    if [ -d ./factorio ]
+    then
+        LogYellow "Server is Already Exist!"
+        return 1
+    fi
+    UpdateServer
+    InitServer
+    return 0
+}
+
+InitCtlServerEnv
 
 if [ $# -lt 1 ]
 then
@@ -134,6 +184,15 @@ then
 elif [ $1 == "update" ]
 then
     UpdateServer
+elif [ $1 == "init" ]
+then
+    InitServer
+elif [ $1 == "backup" ]
+then
+    BackupServer
+elif [ $1 == "install" ]
+then
+    InstallServer
 else
     echo "Error Param $1"
     PrintHelp
