@@ -135,6 +135,7 @@ InitServer(){
     $cmdstr
     LogGreen "Initialize Finish!"
     rm -rf $testmap
+    MD factorio/saves
 }
 
 BackupServer(){
