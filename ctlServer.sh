@@ -78,7 +78,7 @@ StartServer(){
         return 1
     fi
     port=$(cat $portfile) 
-    startcmd=nohup ./factorio/bin/x64/factorio --start-server-load-latest --server-settings ./config/server-settings.json --server-adminlist server-adminlist.json --port=$port > app.log 2>&1 &
+    startcmd=nohup ./factorio/bin/x64/factorio --start-server-load-latest --server-settings ./config/server-settings.json --port=$port > app.log 2>&1 &
     echo $startcmd
     $startcmd
     pid=$(echo $!)
