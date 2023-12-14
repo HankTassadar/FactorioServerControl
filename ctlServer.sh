@@ -66,8 +66,23 @@ StopServer(){
         else
             LogRed "PID: $pid Is Not Exist"
         fi
+        echo -ne "\033[?25l"
+        counter=0
+        while IsPidExist $pid
+        do
+            let "counter++"
+            if [ $counter -gt 10 ]
+            then
+                echo -ne "\033[1K\r"
+                counter=0
+            fi
+            sleep 0.5
+            echo -n "."
+        done
+        echo -ne "\033[?25h"
         rm -rf $pidfile
     fi
+    echo -ne "\033[1K\r"
     LogGreen "Server Stop Finish!"
 }
 
@@ -78,7 +93,7 @@ StartServer(){
         return 1
     fi
     port=$(cat $portfile) 
-    startcmd=nohup ./factorio/bin/x64/factorio --start-server-load-latest --server-settings ./config/server-settings.json --port=$port > app.log 2>&1 &
+    startcmd=nohup ./factorio/bin/x64/factorio --start-server-load-latest --server-settings ./config/server-settings.json --server-adminlist server-adminlist.json --port=$port > app.log 2>&1 &
     echo $startcmd
     $startcmd
     pid=$(echo $!)
@@ -130,7 +145,8 @@ stop : Stop the server if it's running \n\
 start : Start the server if it's not running \n\
 reboot : Restart the server whether it's running \n\
 update : Download the latest Server Package and decompress it \n\
-init : Initialize the server to create some floder like mods, config
+init : Initialize the server to create some floder like mods, config \n\
+install : Install the latest Server \n
 "
 echo -e $helpstr
 
