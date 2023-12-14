@@ -2,10 +2,10 @@
 
 #user variable
 mapfile=2023-12-12.zip
-port=1338
 
 #shell variable
-pidfile=.factorio.pid
+portfile=./config/port
+pidfile=./config/.factorio.pid
 serverpackurl=https://factorio.com/get-download/stable/headless/linux64
 modbackupPath=./config/modbackup
 mapbackupPath=./config/mapbackup
@@ -76,13 +76,21 @@ StartServer(){
     then
         LogYellow "Server Is Already Running!"
         return 1
-    fi    
-    startcmd=nohup ./factorio/bin/x64/factorio --start-server $mapfile --server-settings server-settings.json --server-adminlist server-adminlist.json --port=$port > app.log 2>&1 &
+    fi
+    port=$(cat $portfile) 
+    startcmd=nohup ./factorio/bin/x64/factorio --start-server-load-latest --server-settings ./config/server-settings.json --server-adminlist server-adminlist.json --port=$port > app.log 2>&1 &
     echo $startcmd
     $startcmd
     pid=$(echo $!)
     cat <<< $pid > $pidfile
-    LogGreen "Start Succeed, Server is Running Now!"
+    sleep 0.1
+    if  IsServerRunning 
+    then
+        LogGreen "Start Succeed, Server Is Running Now!"
+    else
+        LogRed "Start Failed, check the app.log for more infomation."
+        rm -rf $pidfile
+    fi
     return 0
 }
 
@@ -136,6 +144,14 @@ InitServer(){
     LogGreen "Initialize Finish!"
     rm -rf $testmap
     MD factorio/saves
+    if [ ! -f config/server-settings.json ]
+    then
+        cp ./factorio/data/server-settings.example.json ./config/server-settings.json
+    fi
+    if [ ! -f config/port ]
+    then
+        cat <<< "1438" > $portfile
+    fi
 }
 
 BackupServer(){
