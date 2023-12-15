@@ -3,11 +3,17 @@
 #user variable
 
 #shell variable
-portfile=./config/port
-pidfile=./config/.factorio.pid
+scriptdir=$(dirname $(readlink -f $0))
+configpath=$scriptdir/config
+portfile=$configpath/port
+pidfile=$configpath/.factorio.pid
+configfile=$configpath/server-settings.json
+serverpackfile=$configpath/linux64
 serverpackurl=https://factorio.com/get-download/stable/headless/linux64
-modbackupPath=./config/modbackup
-mapbackupPath=./config/mapbackup
+modbackupPath=$configpath/modbackup
+mapbackupPath=$configpath/mapbackup
+binpath=$scriptdir/factorio/bin/x64/factorio
+serverversion='0.0.0'
 
 MD(){
     if [ ! -d $1 ]
@@ -40,6 +46,25 @@ if kill -0 $1 >/dev/null 2>&1; then
 else
     return 1
 fi
+}
+
+GetServerVersion(){
+	serverversion=$($binpath --version | grep Version|grep -oP '(\d+\.\d+\.\d+)')
+}
+
+latestversion="0.0.0"
+GetLatestOnlineVersion(){
+	latestversion="0.0.0"
+	wget -q -P $configpath https://www.factorio.com/download
+	downloadstatus=$(echo $!)
+	if [ ! $downloadstatus == 0 ]
+    then
+		LogRed "Get Online LatestVersion Failed!"
+        return 1
+    fi
+    versionfile=$configpath/download 
+	latestversion=$(cat $versionfile |grep -v stable|grep -o 'get-download/1.*/headless/linux'|grep -o '[0-9.]*')
+	rm -rf $versionfile
 }
 
 IsServerRunning(){
@@ -85,9 +110,11 @@ StopServer(){
 		
 		#remove the pid file
         rm -rf $pidfile
+	    echo -ne "\033[1K\r"
+    	LogGreen "Server Stop Finish!"
+	else
+		LogYellow "Can not Find Pid"
     fi
-    echo -ne "\033[1K\r"
-    LogGreen "Server Stop Finish!"
 
 }
 
@@ -98,7 +125,7 @@ StartServer(){
         return 1
     fi
     port=$(cat $portfile) 
-    startcmd=nohup ./factorio/bin/x64/factorio --start-server-load-latest --server-settings ./config/server-settings.json --server-adminlist server-adminlist.json --port=$port > app.log 2>&1 &
+    startcmd=nohup $binpath --start-server-load-latest --server-settings ./config/server-settings.json --server-adminlist server-adminlist.json --port=$port > app.log 2>&1 &
     echo $startcmd
     $startcmd
     pid=$(echo $!)
@@ -145,13 +172,13 @@ RestartServer(){
 }
 
 UpdateServer(){
-    if [ -f linux64 ]
+    if [ -f $serverpackfile ]
     then
-         rm -rf linux64
+         rm -rf $serverpackfile
     fi
     LogGreen "Begin Download Latest Server Package!"
     echo ""
-    if wget --no-check-certificate  $serverpackurl
+    if wget --no-check-certificate -P $configpath  $serverpackurl
     then
         LogGreen "Download Succeed!"
     else
@@ -183,39 +210,39 @@ echo -e $helpstr
 }
 
 InitServer(){
-    testmap=testmap.zip
-    cmdstr="./factorio/bin/x64/factorio --create $testmap"
+    testmap=$scriptdir/testmap.zip
+    cmdstr="$binpath --create $testmap"
     LogYellow "Initialize...... \nStart to Create TestMap"
     $cmdstr
     LogGreen "Initialize Finish!"
     rm -rf $testmap
-    MD factorio/saves
-    if [ ! -f config/server-settings.json ]
+    MD $scriptdir/factorio/saves
+    if [ ! -f $configfile ]
     then
-        cp ./factorio/data/server-settings.example.json ./config/server-settings.json
+        cp $scriptdir/factorio/data/server-settings.example.json $configfile
     fi
-    if [ ! -f config/port ]
+    if [ ! -f $portfile ]
     then
         cat <<< "1438" > $portfile
     fi
 }
 
 BackupServer(){
-    if [ -d ./factorio/mods ]
+    if [ -d $scriptdir/factorio/mods ]
     then
         LogYellow "Backup mods ......"
-        cp -r factorio/mods $modbackupPath
+        cp -r $scriptdir/factorio/mods $modbackupPath
     fi
-    if [ -d ./factorio/saves ]
+    if [ -d $scriptdir/factorio/saves ]
     then
         LogYellow "Backup maps ......"
-        cp -r ./factorio/saves $mapbackupPath
+        cp -r $scriptdir/factorio/saves $mapbackupPath
     fi
     LogGreen "Backup Finish!"
 }
 
 InstallServer(){
-    if [ -d ./factorio ]
+    if [ -d $scriptdir/factorio ]
     then
         LogYellow "Server is Already Exist!"
         return 1
@@ -233,7 +260,6 @@ then
     exit 0
 fi
 
-echo -e "\n\n"
 
 if [ $1 == "stop" ]
 then
@@ -256,10 +282,18 @@ then
 elif [ $1 == "install" ]
 then
     InstallServer
+elif [ $1 == "version" ]
+then
+	GetServerVersion
+	echo $serverversion
+elif [ $1 == "latestversion" ]
+then
+    if GetLatestOnlineVersion
+    then
+    	echo $latestversion
+ 	fi
 else
     echo "Error Param $1"
     PrintHelp
 fi
 
-echo ""
-echo ""
