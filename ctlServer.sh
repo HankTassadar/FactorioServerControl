@@ -1,7 +1,6 @@
 #!/bin/bash
 
 #user variable
-mapfile=2023-12-12.zip
 
 #shell variable
 portfile=./config/port
@@ -65,7 +64,10 @@ StopServer(){
             LogGreen "Server Stoped! PID: $pid"
         else
             LogRed "PID: $pid Is Not Exist"
+			return 0
         fi
+
+		#start stop the server
         echo -ne "\033[?25l"
         counter=0
         while IsPidExist $pid
@@ -80,10 +82,13 @@ StopServer(){
             echo -n "."
         done
         echo -ne "\033[?25h"
+		
+		#remove the pid file
         rm -rf $pidfile
     fi
     echo -ne "\033[1K\r"
     LogGreen "Server Stop Finish!"
+
 }
 
 StartServer(){
@@ -98,14 +103,39 @@ StartServer(){
     $startcmd
     pid=$(echo $!)
     cat <<< $pid > $pidfile
-    sleep 0.1
-    if  IsServerRunning 
-    then
+
+	LogYellow "Start Server Now, Please Wait!"	
+	counter=0
+	startupflag=0
+    echo -ne "\033[?25l"
+	while IsPidExist $pid
+	do
+		let "counter++"
+		if [ $counter -gt 10 ]
+		then
+			echo -ne "\033[1K\r"
+			counter=0
+		fi
+		sleep 0.5
+		echo -n "."
+		matchresult=$(tail -n1 app.log|grep -o 'Matching server')
+		if [ "$matchresult" = "Matching server" ]
+		then
+			startupflag=1
+			echo -ne "\033[1K\r"
+			break
+		fi
+	done
+	echo -ne "\033[?25h"
+
+	if [ $startupflag == 1 ]
+	then	
         LogGreen "Start Succeed, Server Is Running Now!"
-    else
+	else
         LogRed "Start Failed, check the app.log for more infomation."
         rm -rf $pidfile
-    fi
+	fi
+
     return 0
 }
 
