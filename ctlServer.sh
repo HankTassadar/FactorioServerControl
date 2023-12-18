@@ -3,6 +3,7 @@
 #user variable
 
 #shell variable
+exepath=$(pwd)
 scriptdir=$(dirname $(readlink -f $0))
 configpath=$scriptdir/config
 portfile=$configpath/port
@@ -10,6 +11,7 @@ pidfile=$configpath/.factorio.pid
 configfile=$configpath/server-settings.json
 serverpackfile=$configpath/linux64
 serverpackurl=https://factorio.com/get-download/stable/headless/linux64
+logPath=$configpath/logs
 modbackupPath=$configpath/modbackup
 mapbackupPath=$configpath/mapbackup
 binpath=$scriptdir/factorio/bin/x64/factorio
@@ -23,9 +25,10 @@ MD(){
 }
 
 InitCtlServerEnv(){
-    MD config
+    MD $configpath
     MD $modbackupPath
     MD $mapbackupPath
+    MD $logPath
 }
 
 LogRed(){
@@ -49,22 +52,24 @@ fi
 }
 
 GetServerVersion(){
-	serverversion=$($binpath --version | grep Version|grep -oP '(\d+\.\d+\.\d+)')
+    serverversion=$($binpath --version | grep Version|grep -oP '(\d+\.\d+\.\d+)')
 }
 
 latestversion="0.0.0"
 GetLatestOnlineVersion(){
-	latestversion="0.0.0"
-	wget -q -P $configpath https://www.factorio.com/download
-	downloadstatus=$(echo $!)
-	if [ ! $downloadstatus == 0 ]
+    cd $configpath
+    latestversion="0.0.0"
+    wget -q https://www.factorio.com/download
+    downloadstatus=$(echo $!)
+    if [ ! $downloadstatus == 0 ]
     then
-		LogRed "Get Online LatestVersion Failed!"
+        LogRed "Get Online LatestVersion Failed!"
+        cd $exepath
         return 1
     fi
-    versionfile=$configpath/download 
-	latestversion=$(cat $versionfile |grep -v stable|grep -o 'get-download/1.*/headless/linux'|grep -o '[0-9.]*')
-	rm -rf $versionfile
+    latestversion=$(cat download |grep -v stable|grep -o 'get-download/.*/headless/linux'|grep -o '[0-9.]*')
+    rm -rf download
+    cd $exepath
 }
 
 IsServerRunning(){
@@ -89,10 +94,10 @@ StopServer(){
             LogGreen "Server Stoped! PID: $pid"
         else
             LogRed "PID: $pid Is Not Exist"
-			return 0
+            return 0
         fi
 
-		#start stop the server
+        #start stop the server
         echo -ne "\033[?25l"
         counter=0
         while IsPidExist $pid
@@ -107,13 +112,13 @@ StopServer(){
             echo -n "."
         done
         echo -ne "\033[?25h"
-		
-		#remove the pid file
+        
+        #remove the pid file
         rm -rf $pidfile
-	    echo -ne "\033[1K\r"
-    	LogGreen "Server Stop Finish!"
-	else
-		LogYellow "Can not Find Pid"
+        echo -ne "\033[1K\r"
+        LogGreen "Server Stop Finish!"
+    else
+        LogYellow "Can not Find Pid"
     fi
 
 }
@@ -124,44 +129,45 @@ StartServer(){
         LogYellow "Server Is Already Running!"
         return 1
     fi
-    port=$(cat $portfile) 
-    startcmd=nohup $binpath --start-server-load-latest --server-settings ./config/server-settings.json --server-adminlist server-adminlist.json --port=$port > app.log 2>&1 &
+    port=$(cat $portfile)
+    logfile=$logPath/$(date +%x-%T).log
+    startcmd=nohup $binpath --start-server-load-latest --server-settings $configfile --port=$port > $logfile 2>&1 &
     echo $startcmd
     $startcmd
     pid=$(echo $!)
     cat <<< $pid > $pidfile
 
-	LogYellow "Start Server Now, Please Wait!"	
-	counter=0
-	startupflag=0
+    LogYellow "Start Server Now, Please Wait!"  
+    counter=0
+    startupflag=0
     echo -ne "\033[?25l"
-	while IsPidExist $pid
-	do
-		let "counter++"
-		if [ $counter -gt 10 ]
-		then
-			echo -ne "\033[1K\r"
-			counter=0
-		fi
-		sleep 0.5
-		echo -n "."
-		matchresult=$(tail -n1 app.log|grep -o 'Matching server')
-		if [ "$matchresult" = "Matching server" ]
-		then
-			startupflag=1
-			echo -ne "\033[1K\r"
-			break
-		fi
-	done
-	echo -ne "\033[?25h"
+    while IsPidExist $pid
+    do
+        let "counter++"
+        if [ $counter -gt 10 ]
+        then
+            echo -ne "\033[1K\r"
+            counter=0
+        fi
+        sleep 0.5
+        echo -n "."
+        matchresult=$(tail -n1 $logfile|grep -o 'Matching server')
+        if [ "$matchresult" = "Matching server" ]
+        then
+            startupflag=1
+            echo -ne "\033[1K\r"
+            break
+        fi
+    done
+    echo -ne "\033[?25h"
 
-	if [ $startupflag == 1 ]
-	then	
+    if [ $startupflag == 1 ]
+    then    
         LogGreen "Start Succeed, Server Is Running Now!"
-	else
+    else
         LogRed "Start Failed, check the app.log for more infomation."
         rm -rf $pidfile
-	fi
+    fi
 
     return 0
 }
@@ -187,10 +193,10 @@ UpdateServer(){
     fi
     echo "" 
     LogGreen "Start Decompressing......"
-    tar -xf linux64
+    tar -xf $serverpackfile
     LogGreen "Decompressing Finish!"
     echo ""
-    rm -rf linux64
+    rm -rf $serverpackfile
     echo ""
     LogGreen "Update Finished!"
 }
@@ -284,16 +290,16 @@ then
     InstallServer
 elif [ $1 == "version" ]
 then
-	GetServerVersion
-	echo $serverversion
+    GetServerVersion
+    echo $serverversion
 elif [ $1 == "latestversion" ]
 then
     if GetLatestOnlineVersion
     then
-    	echo $latestversion
- 	fi
+        echo $latestversion
+    fi
 else
-    echo "Error Param $1"
+    LogRed "Error Param $1"
     PrintHelp
 fi
 
