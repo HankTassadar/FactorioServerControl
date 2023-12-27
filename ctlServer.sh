@@ -56,6 +56,7 @@ GetServerVersion(){
 }
 
 latestversion="0.0.0"
+#get the latest stable version
 GetLatestOnlineVersion(){
     cd $configpath
     latestversion="0.0.0"
@@ -67,7 +68,7 @@ GetLatestOnlineVersion(){
         cd $exepath
         return 1
     fi
-    latestversion=$(cat download |grep -v stable|grep -o 'get-download/.*/headless/linux'|grep -o '[0-9.]*')
+    latestversion=$(cat download |grep 'get-download/.*/headless/linux'|awk '/the latest stable version/{getline;print}'| grep -o download/.*/headless | grep -o '[0-9.]*')
     rm -rf download
     cd $exepath
 }
